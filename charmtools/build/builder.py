@@ -254,7 +254,7 @@ class Builder(object):
         return self.fetch_deps(self.top_layer)
 
     def fetch_deps(self, layer):
-        results = {"layers": [], "interfaces": []}
+        results = {"layers": [], "interfaces": [], "relations": []}
         self.fetch_dep(layer, results)
         # results should now be a bottom up list
         # of deps. Using the in order results traversal
@@ -263,6 +263,7 @@ class Builder(object):
         results["layers"].append(layer)
         self._layers = results["layers"]
         self._interfaces = results["interfaces"]
+        self._relations = results["relations"]
         return results
 
     def fetch_dep(self, layer, results):
@@ -285,6 +286,22 @@ class Builder(object):
                 if iface.name in [i.name for i in results['interfaces']]:
                     continue
                 results["interfaces"].append(iface.fetch())
+            elif base.startswith("relation:"):
+                # TODO(AJK): need to work out what to do with a relation
+                # e.g. should the relation match something in metadata.yaml as
+                # that's what we've got to generate the hooks for.  I think
+                # that they should be the same.  i.e. the name in:
+                # relation:shared-db is 'shared-db' and it's the same as the
+                # metadata.yaml key name for the relation (which has a specific
+                # "interface" key of, say, "mysql-shared"  -- note that this is
+                # different to "layer.yaml" which specifies the "interface"
+                # key, and not the "relation".  (hence why it is called
+                # "relation" here).  We have to check (at some point, that they
+                # are not used twice in some way).
+                relation_name = base[len('relation:'):]
+                if relation_name in results["relations"]:
+                    continue
+                results["relations"].append(relation_name)
             else:
                 base_layer = Layer(base, self.deps)
                 if base_layer.name in [i.name for i in results['layers']]:
@@ -396,6 +413,19 @@ class Builder(object):
                         relation_name, iface.url, self.target,
                         target_config, template_file))
 
+    def plan_relations(self, layers, output_files, plan):
+        """Relations are just planned to get the relevant relation hooks with
+        templated files into the built charm.
+
+        They have to be mentioned in the layer.yaml file as
+        'relation:<relation-name>' and the lines get generated as:
+        <relation-name>-relation-{joined,changed,broken,departed}'
+        """
+        if not layers.get('relations'):
+            return
+        # TODO(AJK) - this needs to create a plan to generate the files in the
+        # hooks directory.
+
     def plan_storage(self, layers, output_files, plan):
         # Storage hooks don't directly map to output files
         # as they are computed in combination with the metadata.yaml
@@ -425,6 +455,7 @@ class Builder(object):
         output_files = OrderedDict()
         self.plan = self.plan_layers(layers, output_files)
         self.plan_interfaces(layers, output_files, self.plan)
+        self.plan_relations(layers, output_files, self.plan)
         self.plan_storage(layers, output_files, self.plan)
         if self.hide_metrics is not True:
             self.post_metrics(layers)

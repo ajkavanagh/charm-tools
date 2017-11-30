@@ -240,6 +240,21 @@ class CopyTactic(Tactic):
         return True
 
 
+class RelationCopy(Tactic):
+    """The Relation doesn't have any code; the purpose of the tactic is to
+    generate the hooks from the template.
+    """
+    def __init__(self, relation_name):
+        self.relation_name = relation_name
+
+    def __str__(self):
+        return "RelationCopy for {}".format(self.relation_name)
+
+    def __call__(self):
+        """Has nothing to copy"""
+        pass
+
+
 class InterfaceCopy(Tactic):
     def __init__(self, interface, relation_name, role, target, config):
         self.interface = interface
@@ -347,6 +362,11 @@ class InterfaceBind(DynamicHookBind):
         '{}-relation-broken',
         '{}-relation-departed'
     ]
+
+
+# A relation is an interface - but c.f. RelationCopy which has no code
+class RelationBind(InterfaceBind):
+    pass
 
 
 class StorageBind(DynamicHookBind):
